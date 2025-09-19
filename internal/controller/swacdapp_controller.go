@@ -18,19 +18,22 @@ package controller
 
 import (
 	"context"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	appv1alpha1 "github.com/WesleyDevops91/KCP-Demo-Project/api/v1alpha1"
+
+	mcbuilder "sigs.k8s.io/multicluster-runtime/pkg/builder"
+	mcmanager "sigs.k8s.io/multicluster-runtime/pkg/manager"
+	mcreconcile "sigs.k8s.io/multicluster-runtime/pkg/reconcile"
 )
 
 // SwacdAPPReconciler reconciles a SwacdAPP object
 type SwacdAPPReconciler struct {
-	client.Client
-	Scheme *runtime.Scheme
+	mgr mcmanager.Manager
 }
 
 // +kubebuilder:rbac:groups=app.example.com,resources=swacdapps,verbs=get;list;watch;create;update;patch;delete
@@ -46,18 +49,41 @@ type SwacdAPPReconciler struct {
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.21.0/pkg/reconcile
-func (r *SwacdAPPReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = logf.FromContext(ctx)
+func (r *SwacdAPPReconciler) Reconcile(ctx context.Context, req mcreconcile.Request) (ctrl.Result, error) {
+	logger := logf.FromContext(ctx)
+	logger.Info("Reconciling SwacdAPP")
 
-	// TODO(user): your logic here
+	logger.Info("Detected cluster", "clusterName", req.ClusterName)
+
+	cl, err := r.mgr.GetCluster(ctx, req.ClusterName)
+	if err != nil {
+		logger.Error(err, "Failed to get cluster")
+		return reconcile.Result{}, client.IgnoreNotFound(err)
+	}
+	cc := cl.GetClient()
+
+	swacdapp := &appv1alpha1.SwacdAPP{}
+	if err := cc.Get(ctx, req.NamespacedName, swacdapp); err != nil {
+		logger.Error(err, "Failed to get SwacdAPP")
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	logger.Info("Successfully reconciled SwacdAPP", "name", swacdapp.Name, "namespace", swacdapp.Namespace, "foo", swacdapp.Spec.Foo, "cluster", req.ClusterName)
+
+	// TODO(user): Add your multicluster logic here
+	// You now have access to:
+	// - req.ClusterName: the cluster this resource is from
+	// - cc: cluster-specific client for this cluster
+	// - swacdapp: the SwacdAPP resource from the specific cluster
 
 	return ctrl.Result{}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *SwacdAPPReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
+func (r *SwacdAPPReconciler) SetupWithManager(mgr mcmanager.Manager) error {
+	r.mgr = mgr
+	return mcbuilder.
+		ControllerManagedBy(mgr).
 		For(&appv1alpha1.SwacdAPP{}).
-		Named("swacdapp").
 		Complete(r)
 }

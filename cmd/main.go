@@ -19,6 +19,7 @@ package main
 import (
 	"crypto/tls"
 	"flag"
+	"k8s.io/client-go/rest"
 	"os"
 	"path/filepath"
 
@@ -39,6 +40,8 @@ import (
 
 	appv1alpha1 "github.com/WesleyDevops91/KCP-Demo-Project/api/v1alpha1"
 	"github.com/WesleyDevops91/KCP-Demo-Project/internal/controller"
+
+	mcmanager "sigs.k8s.io/multicluster-runtime/pkg/manager"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -56,6 +59,7 @@ func init() {
 
 // nolint:gocyclo
 func main() {
+	var server string
 	var metricsAddr string
 	var metricsCertPath, metricsCertName, metricsCertKey string
 	var webhookCertPath, webhookCertName, webhookCertKey string
@@ -64,6 +68,7 @@ func main() {
 	var secureMetrics bool
 	var enableHTTP2 bool
 	var tlsOpts []func(*tls.Config)
+	flag.StringVar(&server, "server", "", "Server address to override")
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -178,7 +183,16 @@ func main() {
 		})
 	}
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	cfg := ctrl.GetConfigOrDie()
+	cfg = rest.CopyConfig(cfg)
+
+	if len(server) > 0 {
+		// override server if flag set
+		setupLog.Info("Server Overridden", "server", server)
+		cfg.Host = server
+	}
+
+	mgr, err := mcmanager.New(cfg, nil, ctrl.Options{
 		Scheme:                 scheme,
 		Metrics:                metricsServerOptions,
 		WebhookServer:          webhookServer,
@@ -202,30 +216,28 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := (&controller.SwacdAPPReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
+	if err := (&controller.SwacdAPPReconciler{}).
+		SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "SwacdAPP")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder
 
-	if metricsCertWatcher != nil {
-		setupLog.Info("Adding metrics certificate watcher to manager")
-		if err := mgr.Add(metricsCertWatcher); err != nil {
-			setupLog.Error(err, "unable to add metrics certificate watcher to manager")
-			os.Exit(1)
-		}
-	}
-
-	if webhookCertWatcher != nil {
-		setupLog.Info("Adding webhook certificate watcher to manager")
-		if err := mgr.Add(webhookCertWatcher); err != nil {
-			setupLog.Error(err, "unable to add webhook certificate watcher to manager")
-			os.Exit(1)
-		}
-	}
+	//if metricsCertWatcher != nil {
+	//	setupLog.Info("Adding metrics certificate watcher to manager")
+	//	if err := mgr.Add(metricsCertWatcher); err != nil {
+	//		setupLog.Error(err, "unable to add metrics certificate watcher to manager")
+	//		os.Exit(1)
+	//	}
+	//}
+	//
+	//if webhookCertWatcher != nil {
+	//	setupLog.Info("Adding webhook certificate watcher to manager")
+	//	if err := mgr.Add(webhookCertWatcher); err != nil {
+	//		setupLog.Error(err, "unable to add webhook certificate watcher to manager")
+	//		os.Exit(1)
+	//	}
+	//}
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up health check")
@@ -236,8 +248,10 @@ func main() {
 		os.Exit(1)
 	}
 
+	ctx := ctrl.SetupSignalHandler()
+
 	setupLog.Info("starting manager")
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+	if err := mgr.Start(ctx); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
