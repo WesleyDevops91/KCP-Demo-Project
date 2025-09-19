@@ -1,0 +1,9 @@
+apiVersion: app.example.com/v1alpha1
+kind: SwacdAPP
+metadata:
+  labels:
+    app.kubernetes.io/name: kcp-demo
+    app.kubernetes.io/managed-by: kustomize
+  name: swacdapp-sample
+spec:
+  foo : "Welcome to KCP Demo"
