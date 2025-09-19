@@ -2,23 +2,65 @@
 
 This document outlines the steps to integrate KCP (Kubernetes Cluster Platform) with the multicluster controller.
 
+## Quick Start
+
+If you just want to test KCP with the current controller setup:
+
+```bash
+# 1. Start KCP server (creates ~/.kcp/admin.kubeconfig)
+kcp start
+
+# 2. In another terminal, set KCP kubeconfig
+export KUBECONFIG=~/.kcp/admin.kubeconfig
+
+# 3. Verify KCP is working
+kubectl get workspaces
+
+# 4. Run the current controller (works without KCP dependencies)
+cd /Users/wesleygeorge/Demo/kcp-demo
+make run
+```
+
+**Note**: The current v3.1.0 controller runs with multicluster-runtime but without KCP dependencies due to version conflicts. Follow the full integration steps below to enable KCP provider functionality.
+
 ## Prerequisites
 
 1. KCP Server installed and running
    ```bash
-   # Install KCP binary
-   curl -Lo kcp https://github.com/kcp-dev/kcp/releases/download/v0.28.1/kcp_v0.28.1_darwin_arm64.tar.gz
+   # Install KCP binary (adjust URL for your platform)
+   curl -Lo kcp_v0.28.1_darwin_arm64.tar.gz https://github.com/kcp-dev/kcp/releases/download/v0.28.1/kcp_v0.28.1_darwin_arm64.tar.gz
    tar -xzf kcp_v0.28.1_darwin_arm64.tar.gz
    sudo mv kcp /usr/local/bin/
    chmod +x /usr/local/bin/kcp
    
-   # Start KCP server
-   kcp start
+   # Verify installation
+   kcp --version
    ```
 
-2. Export KCP kubeconfig
+2. Start KCP server (this creates the admin.kubeconfig file)
    ```bash
+   # Start KCP server - this will create ~/.kcp/admin.kubeconfig
+   kcp start
+   
+   # KCP will output something like:
+   # I0919 03:15:00.000000   12345 server.go:123] "Starting KCP server"
+   # I0919 03:15:00.000000   12345 server.go:456] "Serving securely on https://localhost:6443"
+   # I0919 03:15:00.000000   12345 server.go:789] "Admin kubeconfig written to" path="/Users/username/.kcp/admin.kubeconfig"
+   ```
+
+3. Export KCP kubeconfig (after starting the server)
+   ```bash
+   # This file is created only after 'kcp start' runs
    export KUBECONFIG=~/.kcp/admin.kubeconfig
+   
+   # Verify connection to KCP
+   kubectl get workspaces
+   ```
+
+4. Alternative: Use KCP kubeconfig directly
+   ```bash
+   # If you prefer not to export KUBECONFIG globally
+   kubectl --kubeconfig=~/.kcp/admin.kubeconfig get workspaces
    ```
 
 ## Integration Steps
@@ -312,6 +354,57 @@ var _ = AfterSuite(func() {
 2. **Replace Directives**: The replace directives in go.mod are necessary to force compatible versions
 3. **Testing**: KCP integration should be tested separately from unit tests
 
+## Troubleshooting
+
+### admin.kubeconfig not found
+**Problem**: `~/.kcp/admin.kubeconfig` doesn't exist after installing KCP binary
+**Solution**: The kubeconfig file is only created when you start the KCP server:
+```bash
+# Start KCP server first
+kcp start
+
+# Then check for the file
+ls -la ~/.kcp/admin.kubeconfig
+```
+
+### KCP server won't start
+**Problem**: KCP fails to start or crashes
+**Common solutions**:
+```bash
+# Clean existing KCP data
+rm -rf ~/.kcp
+
+# Start with fresh configuration
+kcp start
+
+# Check if port 6443 is already in use
+lsof -i :6443
+```
+
+### Cannot connect to KCP
+**Problem**: `kubectl get workspaces` fails
+**Solutions**:
+```bash
+# Verify KCP is running
+ps aux | grep kcp
+
+# Check kubeconfig path
+echo $KUBECONFIG
+cat ~/.kcp/admin.kubeconfig
+
+# Test connection directly
+kubectl --kubeconfig=~/.kcp/admin.kubeconfig cluster-info
+```
+
+### Dependency conflicts during build
+**Problem**: Go build fails with "missing method" errors
+**Solution**: Ensure all replace directives are properly applied in go.mod:
+```bash
+go mod tidy
+go clean -modcache
+go mod download
+```
+
 ## Alternative Approach: Conditional KCP Integration
 
 For production environments where KCP may not be available, consider implementing conditional KCP integration:
@@ -346,10 +439,57 @@ This allows the controller to work both with and without KCP integration.
 ## Verification
 
 1. Start KCP server
-2. Set KCP kubeconfig
-3. Run the controller with KCP_ENABLED=true
-4. Verify APIBinding resources are being watched
-5. Test multicluster deployment scenarios
+   ```bash
+   # In one terminal, start KCP
+   kcp start
+   
+   # You should see output like:
+   # "Admin kubeconfig written to /Users/username/.kcp/admin.kubeconfig"
+   ```
+
+2. Set KCP kubeconfig (in another terminal)
+   ```bash
+   export KUBECONFIG=~/.kcp/admin.kubeconfig
+   ```
+
+3. Verify KCP connection
+   ```bash
+   # Check KCP cluster info
+   kubectl cluster-info
+   
+   # List workspaces (should show 'root' workspace)
+   kubectl get workspaces
+   
+   # Create a test workspace
+   kubectl create workspace test-workspace
+   ```
+
+4. Run the controller with KCP_ENABLED=true
+   ```bash
+   # Set environment variable to enable KCP integration
+   export KCP_ENABLED=true
+   
+   # Run the controller
+   make run
+   ```
+
+5. Verify APIBinding resources are being watched
+   ```bash
+   # In another terminal with KCP kubeconfig
+   kubectl get apibindings
+   
+   # Check controller logs for KCP provider activity
+   # Look for logs about APIBinding watches and cluster discovery
+   ```
+
+6. Test multicluster deployment scenarios
+   ```bash
+   # Apply a sample SwacdAPP resource
+   kubectl apply -f config/samples/app_v1alpha1_swacdapp.yaml
+   
+   # Check controller logs for cluster-aware reconciliation
+   # Should show cluster context in reconciliation logs
+   ```
 
 ## Next Steps
 
