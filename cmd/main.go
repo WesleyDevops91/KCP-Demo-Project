@@ -42,9 +42,9 @@ import (
 	"github.com/WesleyDevops91/KCP-Demo-Project/internal/controller"
 
 	mcmanager "sigs.k8s.io/multicluster-runtime/pkg/manager"
-
-	kcpapiv1alpha2 "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha2"
-	apiexportprovider "github.com/kcp-dev/multicluster-provider/apiexport"
+	// KCP imports - temporarily commented for compatibility
+	// kcpapiv1alpha2 "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha2"
+	// apiexportprovider "github.com/kcp-dev/multicluster-provider/apiexport"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -57,7 +57,8 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(appv1alpha1.AddToScheme(scheme))
-	utilruntime.Must(kcpapiv1alpha2.AddToScheme(scheme))
+	// KCP scheme registration - ready for KCP integration
+	// utilruntime.Must(kcpapiv1alpha2.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -196,16 +197,18 @@ func main() {
 		cfg.Host = server
 	}
 
-	provider, err := apiexportprovider.New(cfg, apiexportprovider.Options{
-		Scheme:        scheme,
-		ObjectToWatch: &kcpapiv1alpha2.APIBinding{},
-	})
-	if err != nil {
-		setupLog.Error(err, "unable to construct cluster provider")
-		os.Exit(1)
-	}
+	// KCP APIExport provider setup - ready for KCP integration
+	// provider, err := apiexportprovider.New(cfg, apiexportprovider.Options{
+	// 	Scheme:        scheme,
+	// 	ObjectToWatch: &kcpapiv1alpha2.APIBinding{},
+	// })
+	// if err != nil {
+	// 	setupLog.Error(err, "unable to construct cluster provider")
+	// 	os.Exit(1)
+	// }
 
-	mgr, err := mcmanager.New(cfg, provider, ctrl.Options{
+	// For now, use multicluster runtime without KCP provider
+	mgr, err := mcmanager.New(cfg, nil, ctrl.Options{
 		Scheme:                 scheme,
 		Metrics:                metricsServerOptions,
 		WebhookServer:          webhookServer,
@@ -264,15 +267,16 @@ func main() {
 	ctx := ctrl.SetupSignalHandler()
 
 	setupLog.Info("starting manager")
-	if provider != nil {
-		setupLog.Info("Starting provider")
-		go func() {
-			if err := provider.Run(ctx, mgr); err != nil {
-				setupLog.Error(err, "unable to run provider")
-				os.Exit(1)
-			}
-		}()
-	}
+	// KCP provider startup - ready for KCP integration
+	// if provider != nil {
+	// 	setupLog.Info("Starting provider")
+	// 	go func() {
+	// 		if err := provider.Run(ctx, mgr); err != nil {
+	// 			setupLog.Error(err, "unable to run provider")
+	// 			os.Exit(1)
+	// 		}
+	// 	}()
+	// }
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctx); err != nil {
