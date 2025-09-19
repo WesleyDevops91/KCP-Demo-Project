@@ -7,60 +7,88 @@ This document outlines the steps to integrate KCP (Kubernetes Cluster Platform) 
 If you just want to test KCP with the current controller setup:
 
 ```bash
-# 1. Start KCP server (creates ~/.kcp/admin.kubeconfig)
+# 1. Start KCP server (creates admin.kubeconfig in current directory)
 kcp start
 
 # 2. In another terminal, set KCP kubeconfig
-export KUBECONFIG=~/.kcp/admin.kubeconfig
+export KUBECONFIG=/Users/wesleygeorge/Demo/.kcp/admin.kubeconfig
 
-# 3. Verify KCP is working
+# 3. Verify KCP is working and test plugins
 kubectl get workspaces
+kubectl ws current
+kubectl kcp workspace
 
-# 4. Run the current controller (works without KCP dependencies)
+# 4. Create a test workspace
+kubectl-create-workspace my-test-workspace --enter
+
+# 5. Run the current controller (works without KCP dependencies)
 cd /Users/wesleygeorge/Demo/kcp-demo
 make run
 ```
 
-**Note**: The current v3.1.0 controller runs with multicluster-runtime but without KCP dependencies due to version conflicts. Follow the full integration steps below to enable KCP provider functionality.
+**Note**: The current v3.1.0 controller runs with multicluster-runtime but without KCP dependencies due to version conflicts. The kubectl plugins are now installed and ready for when you enable full KCP integration. Follow the full integration steps below to enable KCP provider functionality.
 
 ## Prerequisites
 
-1. KCP Server installed and running
+1. **KCP Server and kubectl plugins installation**
    ```bash
    # Install KCP binary (adjust URL for your platform)
    curl -Lo kcp_v0.28.1_darwin_arm64.tar.gz https://github.com/kcp-dev/kcp/releases/download/v0.28.1/kcp_v0.28.1_darwin_arm64.tar.gz
    tar -xzf kcp_v0.28.1_darwin_arm64.tar.gz
    sudo mv kcp /usr/local/bin/
-   chmod +x /usr/local/bin/kcp
+   sudo chmod +x /usr/local/bin/kcp
    
-   # Verify installation
+   # Install KCP kubectl plugins
+   curl -Lo apigen_0.28.1_darwin_arm64.tar.gz https://github.com/kcp-dev/kcp/releases/download/v0.28.1/apigen_0.28.1_darwin_arm64.tar.gz
+   curl -Lo kubectl-create-workspace-plugin_0.28.1_darwin_arm64.tar.gz https://github.com/kcp-dev/kcp/releases/download/v0.28.1/kubectl-create-workspace-plugin_0.28.1_darwin_arm64.tar.gz
+   curl -Lo kubectl-kcp-plugin_0.28.1_darwin_arm64.tar.gz https://github.com/kcp-dev/kcp/releases/download/v0.28.1/kubectl-kcp-plugin_0.28.1_darwin_arm64.tar.gz
+   curl -Lo kubectl-ws-plugin_0.28.1_darwin_arm64.tar.gz https://github.com/kcp-dev/kcp/releases/download/v0.28.1/kubectl-ws-plugin_0.28.1_darwin_arm64.tar.gz
+   
+   # Extract and install plugins
+   for file in *.tar.gz; do tar -xzf "$file"; done
+   sudo mv bin/* /usr/local/bin/
+   sudo chmod +x /usr/local/bin/kubectl-* /usr/local/bin/apigen
+   rm -f *.tar.gz && rmdir bin
+   
+   # Verify installations
    kcp --version
+   kubectl kcp --help
+   kubectl ws --help
    ```
 
-2. Start KCP server (this creates the admin.kubeconfig file)
+2. **Start KCP server** (this creates the admin.kubeconfig file)
    ```bash
-   # Start KCP server - this will create ~/.kcp/admin.kubeconfig
+   # Start KCP server - this will create admin.kubeconfig in current directory/.kcp/
    kcp start
    
    # KCP will output something like:
-   # I0919 03:15:00.000000   12345 server.go:123] "Starting KCP server"
-   # I0919 03:15:00.000000   12345 server.go:456] "Serving securely on https://localhost:6443"
-   # I0919 03:15:00.000000   12345 server.go:789] "Admin kubeconfig written to" path="/Users/username/.kcp/admin.kubeconfig"
+   # I0919 03:15:00.000000   12345 server.go:789] "Admin kubeconfig written to" path="/current/directory/.kcp/admin.kubeconfig"
    ```
 
-3. Export KCP kubeconfig (after starting the server)
+3. **Export KCP kubeconfig** (after starting the server)
    ```bash
-   # This file is created only after 'kcp start' runs
-   export KUBECONFIG=~/.kcp/admin.kubeconfig
+   # The file is created in the directory where you run 'kcp start'
+   # If you started from /Users/username/Demo, then:
+   export KUBECONFIG=/Users/username/Demo/.kcp/admin.kubeconfig
+   
+   # Or find it automatically:
+   export KUBECONFIG=$(find ~ -name admin.kubeconfig -path "*/.kcp/*" 2>/dev/null | head -1)
    
    # Verify connection to KCP
    kubectl get workspaces
+   kubectl ws current
    ```
 
-4. Alternative: Use KCP kubeconfig directly
+4. **Test KCP plugins**
    ```bash
-   # If you prefer not to export KUBECONFIG globally
-   kubectl --kubeconfig=~/.kcp/admin.kubeconfig get workspaces
+   # List current workspace
+   kubectl ws .
+   
+   # Create a test workspace
+   kubectl-create-workspace test-workspace --enter
+   
+   # Use KCP-specific commands
+   kubectl kcp workspace
    ```
 
 ## Integration Steps
@@ -358,13 +386,31 @@ var _ = AfterSuite(func() {
 
 ### admin.kubeconfig not found
 **Problem**: `~/.kcp/admin.kubeconfig` doesn't exist after installing KCP binary
-**Solution**: The kubeconfig file is only created when you start the KCP server:
+**Solution**: The kubeconfig file is created in the directory where you run `kcp start`:
 ```bash
-# Start KCP server first
+# If you ran 'kcp start' from /Users/username/Demo
+ls -la /Users/username/Demo/.kcp/admin.kubeconfig
+
+# If you ran 'kcp start' from home directory  
+ls -la ~/.kcp/admin.kubeconfig
+
+# Find the kubeconfig file
+find ~ -name "admin.kubeconfig" 2>/dev/null
+```
+
+### Confusion between 'kcp' command and 'kcp-demo' directory
+**Problem**: Typing `cd kcp` goes to `kcp-demo` directory instead of running KCP
+**Explanation**: This is normal shell behavior:
+- `kcp` (command) = KCP binary for starting server (`/usr/local/bin/kcp`)
+- `kcp-demo` (directory) = Your project folder
+- `cd kcp` + Tab completion = `cd kcp-demo` (shell autocompletes to directory)
+**Solution**: Use explicit commands:
+```bash
+# Start KCP server
 kcp start
 
-# Then check for the file
-ls -la ~/.kcp/admin.kubeconfig
+# Navigate to project  
+cd kcp-demo
 ```
 
 ### KCP server won't start

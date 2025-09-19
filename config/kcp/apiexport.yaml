@@ -1,0 +1,12 @@
+apiVersion: apis.kcp.io/v1alpha2
+kind: APIExport
+metadata:
+  name: swacdapp-api
+  namespace: default
+spec:
+  resources:
+  - group: app.example.com
+    name: swacdapps
+    schema: v1alpha1.swacdapps.app.example.com
+    storage:
+      crd: {}

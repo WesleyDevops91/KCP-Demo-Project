@@ -1,0 +1,53 @@
+apiVersion: apis.kcp.io/v1alpha1
+kind: APIResourceSchema
+metadata:
+  name: v1alpha1.swacdapps.app.example.com
+  namespace: default
+spec:
+  group: app.example.com
+  names:
+    categories:
+    - all
+    kind: SwacdAPP
+    listKind: SwacdAPPList
+    plural: swacdapps
+    singular: swacdapp
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    served: true
+    storage: true
+    schema:
+      type: object
+      properties:
+        apiVersion:
+          type: string
+        kind:
+          type: string
+        metadata:
+          type: object
+        spec:
+          type: object
+          properties:
+            foo:
+              type: string
+              description: "Foo is an example field of SwacdAPP. Edit swacdapp_types.go to remove/update"
+        status:
+          type: object
+          properties:
+            conditions:
+              type: array
+              items:
+                type: object
+                properties:
+                  type:
+                    type: string
+                  status:
+                    type: string
+                  lastTransitionTime:
+                    type: string
+                    format: date-time
+                  reason:
+                    type: string
+                  message:
+                    type: string

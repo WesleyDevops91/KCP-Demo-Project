@@ -1,0 +1,14 @@
+apiVersion: app.example.com/v1alpha1
+kind: SwacdAPP
+metadata:
+  name: cloudflare-swacd-sample
+  namespace: default
+spec:
+  foo: "Cloudflare CDN Configuration"
+  # Add your specific configuration here
+  # For example:
+  # provider: "cloudflare"
+  # zone: "example.com"
+  # settings:
+  #   caching: true
+  #   ssl: "strict"

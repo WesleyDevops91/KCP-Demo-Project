@@ -1,0 +1,10 @@
+apiVersion: apis.kcp.io/v1alpha2
+kind: APIBinding
+metadata:
+  name: swacdapp-binding-akamai
+  namespace: default
+spec:
+  reference:
+    export:
+      path: root:swacd
+      name: swacdapp-api

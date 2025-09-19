@@ -1,0 +1,14 @@
+apiVersion: app.example.com/v1alpha1
+kind: SwacdAPP
+metadata:
+  name: akamai-swacd-sample
+  namespace: default
+spec:
+  foo: "Akamai CDN Configuration"
+  # Add your specific configuration here
+  # For example:
+  # provider: "akamai"
+  # propertyId: "12345"
+  # settings:
+  #   acceleration: true
+  #   compression: "gzip"
